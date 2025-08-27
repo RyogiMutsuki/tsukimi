@@ -23,6 +23,10 @@ jobs:
         RUSTC_WRAPPER: "sccache"
 
     steps:
+      - name: Install Git
+        run: |
+          sudo apt update
+          sudo apt install -y git
       - name: Checkout
         uses: actions/checkout@v4
         with:

@@ -44,8 +44,7 @@ jobs:
       - name: Setup Rust
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly
-          . "/root/.cargo/env"
-
+          echo "PATH=\"$HOME/.cargo/bin:$PATH\"" >> $GITHUB_ENV
       - name: Toolchain version
         run: |
           echo "######### PACKAGE VERSION ##########"

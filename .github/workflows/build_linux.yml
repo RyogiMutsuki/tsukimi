@@ -4,17 +4,22 @@ on:
 
 jobs:
   build:
+    name: Build for ${{ matrix.platform }}
     strategy:
       matrix:
         include:
           - platform: amd64
             os: ubuntu-latest
-            arch: x86_64
           - platform: arm64
             os: ubuntu-24.04-arm
-            arch: aarch64
 
     runs-on: ${{ matrix.os }}
+
+    container:
+      image: ubuntu:plucky
+      env:
+        SCCACHE_GHA_ENABLED: "true"
+        RUSTC_WRAPPER: "sccache"
 
     steps:
       - name: Checkout
@@ -22,29 +27,43 @@ jobs:
         with:
           submodules: true
 
-      - name: Cache
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: tsukimi-build-${{ matrix.arch }}-linux-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            tsukimi-build-${{ matrix.arch }}-linux-
-
-      - name: Build tsukimi for ${{ matrix.platform }}
-        env:
-          DANDANAPI_SECRET_KEY: ${{ secrets.DANDANAPI_SECRET_KEY }}
+      - name: Install dependencies
         run: |
-          echo $DANDANAPI_SECRET_KEY > secret/key
-          docker run --rm --platform linux/${{matrix.platform}} -v ${{ github.workspace }}:/app -v ./docker/entrypoint.sh:/entrypoint.sh ghcr.io/tsukinaha/ubuntu-rust-gtk4:latest
-          sudo cp target/release/tsukimi .
-          sudo cp -r i18n/locale .
-          sudo cp resources/moe*.xml .
+          sudo apt-get update
+          sudo apt-get upgrade -y
+          sudo apt-get install -y build-essential curl gettext pkg-config libssl-dev libgtk-4-dev \
+          libadwaita-1-dev libmpv-dev libgstreamer1.0-dev libgstreamer-plugins-bad1.0-dev \
+          libgstreamer-plugins-base1.0-dev libgstreamer-plugins-good1.0-dev gstreamer1.0-libav
+
+      - name: Setup Rust
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly
+          source $HOME/.cargo/env
+
+      - name: Toolchain version
+        run: |
+          echo "######### PACKAGE VERSION ##########"
+          cargo --version
+          echo "gtk4 version: $(pkgconf --modversion gtk4)"
+          echo "gstreamer version: $(pkgconf --modversion gstreamer-1.0)"
+          echo "######### PACKAGE VERSION ##########"
+
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Show sccache stats
+        run: ${SCCACHE_PATH} --show-stats
+
+      - name: Build tsukimi (${{ matrix.platform }})
+        run: |
+          echo ${{ secrets.DANDANAPI_SECRET_KEY }} > secret/key
+          cargo build --release --locked
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tsukimi-${{matrix.arch}}-linux
+          name: tsukimi-${{matrix.platform}}-linux
           path: |
             locale/
-            tsukimi
-            moe*.xml
+            target/release/tsukimi
+            resources/moe*.xml

@@ -44,7 +44,7 @@ jobs:
       - name: Setup Rust
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly
-          . "$HOME/.cargo/env"
+          . "/root/.cargo/env"
 
       - name: Toolchain version
         run: |
